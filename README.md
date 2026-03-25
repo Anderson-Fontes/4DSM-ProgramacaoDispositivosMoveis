@@ -35,16 +35,4 @@ Este repositório contém a **Parte 1** do projeto, focada na construção da In
 * **Hooks Customizados:** Uso intensivo de `useState` para controle de formulários e `useEffect` para carregamento de dados mockados.
 * **Vector Icons:** Utilização da biblioteca de ícones do Expo para uma interface mais rica e intuitiva.
 
-## 🚀 Como Executar o Projeto
 
-Siga os passos abaixo para rodar o aplicativo localmente na sua máquina:
-
-### Pré-requisitos
-* [Node.js](https://nodejs.org/) instalado.
-* Aplicativo **Expo Go** instalado no seu smartphone (Android ou iOS) ou um emulador configurado no PC.
-
-### Passo a Passo
-
-1. **Clone o repositório:**
-   ```bash
-   git clone [https://github.com/Anderson-Fontes/4DSM-ProgramacaoDispositivosMoveis.git](https://github.com/Anderson-Fontes/4DSM-ProgramacaoDispositivosMoveis.git)
