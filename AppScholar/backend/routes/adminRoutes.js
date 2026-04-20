@@ -3,18 +3,29 @@ const router = express.Router();
 const adminController = require('../controllers/adminController');
 const { verificarToken, checarPerfil } = require('../middlewares/authMiddleware');
 
-// Todas as rotas desta página exigem token.
-// Como nosso middleware já deixa o 'master' passar direto, só precisamos barrar quem não for 'diretor'
-router.use(verificarToken, checarPerfil(['diretor']));
+// Valida que há um token antes de prosseguir
+router.use(verificarToken);
 
-// Rotas de Cadastro (POST)
-router.post('/professores', adminController.cadastrarProfessor);
-router.post('/alunos', adminController.cadastrarAluno);
-router.post('/disciplinas', adminController.cadastrarDisciplina);
+// ================= ROTAS DE LISTAGEM =================
+// Alunos: Apenas Diretor e Professor
+router.get('/alunos', checarPerfil(['diretor', 'professor']), adminController.listarAlunos);
 
-// Rotas de Gerenciamento (GET, PUT, DELETE)
-router.get('/usuarios', adminController.listarUsuarios);
-router.put('/usuarios/:id', adminController.atualizarUsuario);
-router.delete('/usuarios/:id', adminController.excluirUsuario);
+// Professores: Apenas Diretor
+router.get('/professores', checarPerfil(['diretor']), adminController.listarProfessores);
+
+// Disciplinas: Todos
+router.get('/disciplinas', checarPerfil(['diretor', 'professor', 'aluno']), adminController.listarDisciplinas);
+
+// Acessos: Apenas Diretor
+router.get('/usuarios', checarPerfil(['diretor']), adminController.listarUsuarios);
+
+
+// ================= ROTAS DE CADASTRO E EDIÇÃO =================
+// Apenas Diretor tem poder para criar e apagar contas
+router.post('/professores', checarPerfil(['diretor']), adminController.cadastrarProfessor);
+router.post('/alunos', checarPerfil(['diretor']), adminController.cadastrarAluno);
+router.post('/disciplinas', checarPerfil(['diretor']), adminController.cadastrarDisciplina);
+router.put('/usuarios/:id', checarPerfil(['diretor']), adminController.atualizarUsuario);
+router.delete('/usuarios/:id', checarPerfil(['diretor']), adminController.excluirUsuario);
 
 module.exports = router;

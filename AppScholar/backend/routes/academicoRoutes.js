@@ -1,14 +1,17 @@
 const express = require('express');
 const router = express.Router();
-const academico = require('../controllers/academicoController');
+const academicoController = require('../controllers/academicoController');
 const { verificarToken, checarPerfil } = require('../middlewares/authMiddleware');
 
-// Professor e Diretor podem gerenciar notas e chamadas
-router.post('/atividades', verificarToken, checarPerfil(['professor', 'diretor']), academico.criarAtividade);
-router.post('/notas', verificarToken, checarPerfil(['professor', 'diretor']), academico.lancarNota);
-router.post('/chamada', verificarToken, checarPerfil(['professor', 'diretor']), academico.registrarPresenca);
+router.use(verificarToken);
 
-// Aluno, Professor e Diretor podem ver o boletim
-// Troque a rota antiga por esta:
-router.get('/boletim/:aluno_id', verificarToken, academico.obterBoletim);
+// Grade Semanal: Todos
+router.get('/grade', checarPerfil(['aluno', 'professor', 'diretor']), academicoController.gradeSemanal);
+
+// Boletim: Apenas Alunos
+router.get('/boletim', checarPerfil(['aluno']), academicoController.verBoletim);
+
+// Solicitações: Apenas Alunos
+router.post('/solicitacoes', checarPerfil(['aluno']), academicoController.novaSolicitacao);
+
 module.exports = router;

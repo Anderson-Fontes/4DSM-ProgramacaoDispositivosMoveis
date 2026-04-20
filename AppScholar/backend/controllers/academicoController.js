@@ -1,93 +1,72 @@
 const db = require('../database/db');
 
 const academicoController = {
-    // Professor lança uma nova atividade (ex: P1) com peso
-    async criarAtividade(req, res) {
-        const { disciplina_id, nome, peso_percentual } = req.body;
+    async gradeSemanal(req, res) {
         try {
-            const novaAtividade = await db.query(
-                'INSERT INTO atividades (disciplina_id, nome, peso_percentual) VALUES ($1, $2, $3) RETURNING *',
-                [disciplina_id, nome, peso_percentual]
-            );
-            res.status(201).json(novaAtividade.rows[0]);
-        } catch (err) { res.status(500).json({ erro: err.message }); }
+            const query = `SELECT nome, dia_semana, horario_inicio, sala FROM disciplinas WHERE curso = (SELECT curso FROM alunos WHERE usuario_id = $1)`;
+            const result = await db.query(query, [req.usuario.id]);
+            res.json(result.rows);
+        } catch (e) { 
+            res.status(500).json({ erro: e.message }); 
+        }
     },
 
-    // Lançar nota de um aluno em uma atividade
-    async lancarNota(req, res) {
-        const { atividade_id, aluno_id, nota } = req.body;
+    async novaSolicitacao(req, res) {
+        const { disciplina_id, tipo } = req.body;
         try {
-            await db.query(
-                'INSERT INTO notas_atividades (atividade_id, aluno_id, nota) VALUES ($1, $2, $3) ON CONFLICT DO UPDATE SET nota = $3',
-                [atividade_id, aluno_id, nota]
-            );
-            res.json({ mensagem: 'Nota registrada!' });
-        } catch (err) { res.status(500).json({ erro: err.message }); }
+            const aluno = await db.query("SELECT id FROM alunos WHERE usuario_id = $1", [req.usuario.id]);
+            await db.query("INSERT INTO solicitacoes (aluno_id, disciplina_id, tipo) VALUES ($1, $2, $3)", [aluno.rows[0].id, disciplina_id, tipo]);
+            res.json({ mensagem: 'Solicitação enviada.' });
+        } catch (e) { 
+            res.status(500).json({ erro: e.message }); 
+        }
     },
 
-    // Fazer Chamada
-    async registrarPresenca(req, res) {
-        const { disciplina_id, aluno_id, presente } = req.body;
+    async verBoletim(req, res) {
         try {
-            await db.query(
-                'INSERT INTO chamadas (disciplina_id, aluno_id, presente) VALUES ($1, $2, $3)',
-                [disciplina_id, aluno_id, presente]
-            );
-            res.json({ mensagem: 'Presença registrada!' });
-        } catch (err) { res.status(500).json({ erro: err.message }); }
-    },
-
-// Consulta de Boletim Completo (Substitua a função antiga por esta)
-    async obterBoletim(req, res) {
-        const { aluno_id } = req.params; // Lendo do usuário logado
-        
-        try {
-            // Verifica qual o ID do aluno correspondente a esse usuario_id
-            const alunoQuery = await db.query('SELECT id FROM alunos WHERE usuario_id = $1', [aluno_id]);
-            if (alunoQuery.rows.length === 0) return res.json([]);
-            
-            const idRealAluno = alunoQuery.rows[0].id;
-
-            // Busca todas as disciplinas, calcula a média ponderada e agrupa
-            const boletimCompleto = await db.query(`
+            // Nova Query SQL Robusta usando CTEs (WITH)
+            const query = `
+                WITH NotasAluno AS (
+                    SELECT 
+                        at.disciplina_id,
+                        na.aluno_id,
+                        AVG(na.nota) as media_notas,
+                        JSON_AGG(JSON_BUILD_OBJECT('nome', at.nome, 'nota', na.nota)) as detalhes
+                    FROM atividades at
+                    JOIN notas_atividades na ON at.id = na.atividade_id
+                    GROUP BY at.disciplina_id, na.aluno_id
+                ),
+                FrequenciaAluno AS (
+                    SELECT 
+                        c.disciplina_id,
+                        c.aluno_id,
+                        COUNT(c.id) as total_aulas,
+                        SUM(CASE WHEN c.presente = true THEN 1 ELSE 0 END) as presencas,
+                        SUM(CASE WHEN c.presente = false THEN 1 ELSE 0 END) as faltas
+                    FROM chamadas c
+                    GROUP BY c.disciplina_id, c.aluno_id
+                )
                 SELECT 
-                    d.id as disciplina_id,
                     d.nome as disciplina,
-                    COALESCE(SUM(n.nota * (a.peso_percentual / 100)), 0) as media,
-                    
-                    -- Lógica de Frequência
-                    COALESCE(
-                        (SELECT (SUM(CASE WHEN presente THEN 1 ELSE 0 END)::FLOAT / COUNT(*)) * 100 
-                         FROM chamadas c WHERE c.disciplina_id = d.id AND c.aluno_id = $1), 
-                    100) as freq_percentual
-
+                    COALESCE(na.media_notas, 0) as media,
+                    na.detalhes as detalhamento,
+                    COALESCE(fa.total_aulas, 0) as total_aulas,
+                    COALESCE(fa.presencas, 0) as presencas,
+                    COALESCE(fa.faltas, 0) as faltas
                 FROM disciplinas d
-                LEFT JOIN atividades a ON d.id = a.disciplina_id
-                LEFT JOIN notas_atividades n ON a.id = n.atividade_id AND n.aluno_id = $1
-                GROUP BY d.id, d.nome
-            `, [idRealAluno]);
-
-            // Formata a resposta com a "Situação" exigida no App
-            const resultadoFormatado = boletimCompleto.rows.map(item => {
-                const mediaNum = parseFloat(item.media);
-                const freqNum = parseFloat(item.freq_percentual);
-                let situacao = 'Em andamento';
-
-                if (mediaNum >= 6 && freqNum >= 75) situacao = 'Aprovado';
-                else if (mediaNum < 6 && mediaNum >= 4) situacao = 'Exame';
-                else if (mediaNum < 4 || freqNum < 75) situacao = 'Reprovado';
-
-                return {
-                    disciplina_id: item.disciplina_id,
-                    disciplina: item.disciplina,
-                    media: mediaNum.toFixed(2),
-                    frequencia: freqNum.toFixed(1) + '%',
-                    situacao: situacao
-                };
-            });
-
-            res.json(resultadoFormatado);
-        } catch (err) { res.status(500).json({ erro: err.message }); }
+                JOIN alunos al ON d.curso = al.curso
+                LEFT JOIN NotasAluno na ON d.id = na.disciplina_id AND al.id = na.aluno_id
+                LEFT JOIN FrequenciaAluno fa ON d.id = fa.disciplina_id AND al.id = fa.aluno_id
+                WHERE al.usuario_id = $1
+                ORDER BY d.nome;
+            `;
+            
+            const result = await db.query(query, [req.usuario.id]);
+            res.json(result.rows);
+        } catch (e) {
+            console.error("Erro no Boletim:", e); // Mostra o erro exato no terminal do node
+            res.status(500).json({ erro: e.message });
+        }
     }
 };
 

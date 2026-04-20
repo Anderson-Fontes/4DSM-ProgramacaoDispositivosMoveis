@@ -7,13 +7,10 @@ import { colors, globalStyles } from '../styles/globalStyles';
 export default function DashboardScreen({ navigation }) {
   const [usuario, setUsuario] = useState(null);
 
-  // Carrega os dados do usuário assim que a tela abre
   useEffect(() => {
     const carregarUsuario = async () => {
       const userJSON = await AsyncStorage.getItem('@appscholar_user');
-      if (userJSON) {
-        setUsuario(JSON.parse(userJSON));
-      }
+      if (userJSON) setUsuario(JSON.parse(userJSON));
     };
     carregarUsuario();
   }, []);
@@ -41,9 +38,8 @@ export default function DashboardScreen({ navigation }) {
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <View>
             <Text style={[globalStyles.label, { marginBottom: 0 }]}>Bem-vindo,</Text>
-            {/* Exibe o perfil ou email do usuário logado */}
             <Text style={globalStyles.screenTitle}>
-              {usuario ? (usuario.perfil === 'master' ? 'Desenvolvedor' : usuario.email) : 'Carregando...'}
+              {usuario ? (usuario.perfil === 'master' ? 'Desenvolvedor' : usuario.nome || usuario.email) : 'Carregando...'}
             </Text>
           </View>
           <TouchableOpacity onPress={handleLogout} style={{ backgroundColor: '#FFE3E3', padding: 10, borderRadius: 15 }}>
@@ -51,20 +47,53 @@ export default function DashboardScreen({ navigation }) {
           </TouchableOpacity>
         </View>
 
-        <Text style={[globalStyles.label, { marginBottom: 15 }]}>O que você precisa gerenciar?</Text>
+        <Text style={[globalStyles.label, { marginBottom: 15 }]}>Menu Principal</Text>
 
         <View style={styles.grid}>
-          {/* APENAS MASTER E DIRETOR VÊEM ESTES BOTÕES */}
+          {/* ACESSOS: Apenas Desenvolvedor (Master) e Direção */}
           {usuario && (usuario.perfil === 'master' || usuario.perfil === 'diretor') && (
-            <>
-              <MenuCard title="Alunos" icon="people" color="#0984E3" onPress={() => navigation.navigate('CadastroAluno')} />
-              <MenuCard title="Professores" icon="school" color="#6C5CE7" onPress={() => navigation.navigate('CadastroProfessor')} />
-              <MenuCard title="Disciplinas" icon="book" color="#E17055" onPress={() => navigation.navigate('CadastroDisciplina')} />
-            </>
+            <MenuCard title="Acessos" icon="shield-checkmark" color="#D63031" onPress={() => navigation.navigate('ListaUsuarios')} />
           )}
 
-          {/* TODOS VÊEM O BOLETIM */}
-          <MenuCard title="Boletim" icon="document-text" color="#00B894" onPress={() => navigation.navigate('Boletim')} />
+          {/* ALUNOS: Desenvolvedor, Direção e Professor */}
+          {usuario && (usuario.perfil === 'master' || usuario.perfil === 'diretor' || usuario.perfil === 'professor') && (
+            <MenuCard title="Alunos" icon="people" color="#0984E3" onPress={() => navigation.navigate('ListaAlunos')} />
+          )}
+
+          {/* DISCIPLINAS: Todos têm acesso */}
+          {usuario && (
+            <MenuCard title="Disciplinas" icon="book" color="#E17055" onPress={() => navigation.navigate('ListaDisciplinas')} />
+          )}
+
+          {/* PROFESSORES: Apenas Desenvolvedor e Direção */}
+          {usuario && (usuario.perfil === 'master' || usuario.perfil === 'diretor') && (
+            <MenuCard title="Professores" icon="school" color="#6C5CE7" onPress={() => navigation.navigate('ListaProfessores')} />
+          )}
+
+          {/* CHAMADA: Desenvolvedor, Direção e Professor */}
+          {usuario && (usuario.perfil === 'master' || usuario.perfil === 'diretor' || usuario.perfil === 'professor') && (
+            <MenuCard title="Chamada" icon="calendar" color="#FDCB6E" onPress={() => navigation.navigate('ProfessorTurmas')} />
+          )}
+
+          {/* LANÇAR NOTAS: Apenas Desenvolvedor e Professor */}
+          {usuario && (usuario.perfil === 'master' || usuario.perfil === 'professor') && (
+            <MenuCard title="Lançar Notas" icon="create" color="#E17055" onPress={() => navigation.navigate('ProfessorNotas')} />
+          )}
+
+          {/* MEU BOLETIM: Apenas Desenvolvedor e Aluno */}
+          {usuario && (usuario.perfil === 'master' || usuario.perfil === 'aluno') && (
+            <MenuCard title="Meu Boletim" icon="document-text" color="#00B894" onPress={() => navigation.navigate('Boletim')} />
+          )}
+
+          {/* GRADE SEMANAL: Todos têm acesso */}
+          {usuario && (
+            <MenuCard title="Grade Semanal" icon="time" color="#0984E3" onPress={() => navigation.navigate('AlunoGrade')} />
+          )}
+
+          {/* SOLICITAÇÕES: Apenas Alunos (Master não entra aqui por ser algo restrito do aluno) */}
+          {usuario && (usuario.perfil === 'aluno') && (
+            <MenuCard title="Solicitações" icon="git-pull-request" color="#6C5CE7" onPress={() => navigation.navigate('AlunoSolicitacoes')} />
+          )}
         </View>
 
       </ScrollView>
@@ -74,6 +103,6 @@ export default function DashboardScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
-  gridItem: { width: '48%', alignItems: 'center', paddingVertical: 25, justifyContent: 'center' },
+  gridItem: { width: '48%', alignItems: 'center', paddingVertical: 25, justifyContent: 'center', marginBottom: 15 },
   iconCircle: { padding: 15, borderRadius: 25, marginBottom: 15 }
 });

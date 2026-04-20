@@ -4,7 +4,7 @@ const bcrypt = require('bcrypt');
 const adminController = {
     // 1. Cadastrar um novo Professor
     async cadastrarProfessor(req, res) {
-        const { email, senha, nome } = req.body;
+        const { email, senha, nome, titulacao, area } = req.body;
         try {
             await db.query('BEGIN');
             const salt = await bcrypt.genSalt(10);
@@ -15,8 +15,8 @@ const adminController = {
                 [email, senhaHash]
             );
             const profRes = await db.query(
-                "INSERT INTO professores (usuario_id, nome) VALUES ($1, $2) RETURNING *",
-                [userRes.rows[0].id, nome]
+                "INSERT INTO professores (usuario_id, nome, titulacao, area) VALUES ($1, $2, $3, $4) RETURNING *",
+                [userRes.rows[0].id, nome, titulacao, area]
             );
 
             await db.query('COMMIT');
@@ -29,7 +29,7 @@ const adminController = {
 
     // 2. Cadastrar um novo Aluno
     async cadastrarAluno(req, res) {
-        const { email, senha, nome, matricula } = req.body;
+        const { email, senha, nome, matricula, curso } = req.body;
         try {
             await db.query('BEGIN');
             const salt = await bcrypt.genSalt(10);
@@ -40,8 +40,8 @@ const adminController = {
                 [email, senhaHash]
             );
             const alunoRes = await db.query(
-                "INSERT INTO alunos (usuario_id, nome, matricula) VALUES ($1, $2, $3) RETURNING *",
-                [userRes.rows[0].id, nome, matricula]
+                "INSERT INTO alunos (usuario_id, nome, matricula, curso) VALUES ($1, $2, $3, $4) RETURNING *",
+                [userRes.rows[0].id, nome, matricula, curso]
             );
 
             await db.query('COMMIT');
@@ -66,7 +66,7 @@ const adminController = {
         }
     },
 
-    // 4. Listar todos os usuários do sistema
+    // 4. Listar todos os usuários do sistema (Controle de Acessos)
     async listarUsuarios(req, res) {
         try {
             const usuarios = await db.query(`
@@ -95,7 +95,7 @@ const adminController = {
         }
     },
 
-    // 6. Editar Usuário (Nome, Email ou Senha)
+    // 6. Editar Usuário
     async atualizarUsuario(req, res) {
         const { id } = req.params;
         const { email, nome, senha, perfil } = req.body;
@@ -121,6 +121,41 @@ const adminController = {
             res.json({ mensagem: 'Dados atualizados com sucesso!' });
         } catch (erro) {
             await db.query('ROLLBACK');
+            res.status(500).json({ erro: erro.message });
+        }
+    },
+
+    // 7. Listar Alunos com dados completos
+    async listarAlunos(req, res) {
+        try {
+            const alunos = await db.query("SELECT * FROM alunos ORDER BY nome");
+            res.json(alunos.rows);
+        } catch (erro) {
+            res.status(500).json({ erro: erro.message });
+        }
+    },
+
+    // 8. Listar Professores com dados completos
+    async listarProfessores(req, res) {
+        try {
+            const professores = await db.query("SELECT * FROM professores ORDER BY nome");
+            res.json(professores.rows);
+        } catch (erro) {
+            res.status(500).json({ erro: erro.message });
+        }
+    },
+
+    // 9. Listar Disciplinas com o nome do professor vinculado
+    async listarDisciplinas(req, res) {
+        try {
+            const disciplinas = await db.query(`
+                SELECT d.*, p.nome as professor_nome 
+                FROM disciplinas d 
+                LEFT JOIN professores p ON d.professor_id = p.id 
+                ORDER BY d.nome
+            `);
+            res.json(disciplinas.rows);
+        } catch (erro) {
             res.status(500).json({ erro: erro.message });
         }
     }
