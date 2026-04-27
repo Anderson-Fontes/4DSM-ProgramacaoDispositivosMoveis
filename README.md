@@ -135,20 +135,10 @@ Antes de começar, certifique-se de ter instalado:
 CREATE DATABASE app_scholar;
 ```
 
-**2.** Selecione o banco e habilite a extensão necessária:
-
-```sql
-\c app_scholar
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
+**2.** Selecione o banco e va em query tool
 ```
 
-**3.** Execute o script SQL completo localizado na raiz do projeto:
-
-```bash
-psql -U seu_usuario -d app_scholar -f banco_app_scholar.sql
-```
-
-> ✅ O script cria todas as tabelas e já popula o banco com dados de teste, incluindo usuários, disciplinas, notas e chamadas.
+**3.** Use o Codigo SQL que esta no txt banco de dados
 
 ---
 
