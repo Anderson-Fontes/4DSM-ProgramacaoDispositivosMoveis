@@ -6,6 +6,16 @@ import axios from 'axios';
 import api from '../services/api';
 import { colors, globalStyles } from '../styles/globalStyles';
 
+const IconInput = ({ icon, label, ...props }) => (
+  <View style={globalStyles.inputGroup}>
+    <Text style={globalStyles.label}>{label}</Text>
+    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+      <Ionicons name={icon} size={20} color={colors.primary} style={{ position: 'absolute', left: 15, zIndex: 1 }} />
+      <TextInput style={[globalStyles.input, { flex: 1, paddingLeft: 45 }]} placeholderTextColor="#A0AEC0" {...props} />
+    </View>
+  </View>
+);
+
 export default function CadastroAlunoScreen() {
   const [nome, setNome] = useState('');
   const [matricula, setMatricula] = useState('');
@@ -77,16 +87,6 @@ export default function CadastroAlunoScreen() {
       setLoading(false);
     }
   };
-
-  const IconInput = ({ icon, label, ...props }) => (
-    <View style={globalStyles.inputGroup}>
-      <Text style={globalStyles.label}>{label}</Text>
-      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-        <Ionicons name={icon} size={20} color={colors.primary} style={{ position: 'absolute', left: 15, zIndex: 1 }} />
-        <TextInput style={[globalStyles.input, { flex: 1, paddingLeft: 45 }]} placeholderTextColor="#A0AEC0" {...props} />
-      </View>
-    </View>
-  );
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={globalStyles.mainContainer}>

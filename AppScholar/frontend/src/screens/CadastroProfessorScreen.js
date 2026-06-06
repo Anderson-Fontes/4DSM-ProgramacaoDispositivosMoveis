@@ -4,6 +4,16 @@ import { Alert, KeyboardAvoidingView, Platform, ScrollView, Text, TextInput, Tou
 import api from '../services/api';
 import { colors, globalStyles } from '../styles/globalStyles';
 
+const IconInput = ({ icon, label, ...props }) => (
+  <View style={globalStyles.inputGroup}>
+    <Text style={globalStyles.label}>{label}</Text>
+    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+      <Ionicons name={icon} size={20} color={colors.primary} style={{ position: 'absolute', left: 15, zIndex: 1 }} />
+      <TextInput style={[globalStyles.input, { flex: 1, paddingLeft: 45 }]} placeholderTextColor="#A0AEC0" {...props} />
+    </View>
+  </View>
+);
+
 export default function CadastroProfessorScreen() {
   const [nome, setNome] = useState('');
   const [titulacao, setTitulacao] = useState('');
@@ -27,16 +37,6 @@ export default function CadastroProfessorScreen() {
       setLoading(false);
     }
   };
-
-  const IconInput = ({ icon, label, ...props }) => (
-    <View style={globalStyles.inputGroup}>
-      <Text style={globalStyles.label}>{label}</Text>
-      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-        <Ionicons name={icon} size={20} color={colors.primary} style={{ position: 'absolute', left: 15, zIndex: 1 }} />
-        <TextInput style={[globalStyles.input, { flex: 1, paddingLeft: 45 }]} placeholderTextColor="#A0AEC0" {...props} />
-      </View>
-    </View>
-  );
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={globalStyles.mainContainer}>
