@@ -1,27 +1,35 @@
+// src/screens/ListaAlunosScreen.js
 import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import {
+    ActivityIndicator, Alert, FlatList, Modal,
+    ScrollView, StyleSheet, Text, TextInput,
+    TouchableOpacity, View
+} from 'react-native';
+import { Picker } from '@react-native-picker/picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../services/api';
 import { colors, globalStyles } from '../styles/globalStyles';
 
 export default function ListaAlunosScreen({ navigation }) {
-    const [alunos, setAlunos] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const [alunos, setAlunos]               = useState([]);
+    const [cursos, setCursos]               = useState([]);
+    const [loading, setLoading]             = useState(true);
     const [perfilUsuario, setPerfilUsuario] = useState('');
 
-    // Estados do Modal de Edição
-    const [modalVisible, setModalVisible] = useState(false);
+    // Modal de edição
+    const [modalVisible, setModalVisible]       = useState(false);
     const [alunoSelecionado, setAlunoSelecionado] = useState(null);
-    const [novoNome, setNovoNome] = useState('');
-    const [novaMatricula, setNovaMatricula] = useState('');
-    const [novoCurso, setNovoCurso] = useState('');
-    const [novoSemestre, setNovoSemestre] = useState('');
+    const [novoNome, setNovoNome]               = useState('');
+    const [novaMatricula, setNovaMatricula]     = useState('');
+    const [novoCursoId, setNovoCursoId]         = useState(null);
+    const [novoSemestre, setNovoSemestre]       = useState('');
 
     useEffect(() => {
         carregarPerfilUsuario();
         const unsubscribe = navigation.addListener('focus', () => {
             buscarAlunos();
+            buscarCursos();
         });
         return unsubscribe;
     }, [navigation]);
@@ -29,32 +37,39 @@ export default function ListaAlunosScreen({ navigation }) {
     const carregarPerfilUsuario = async () => {
         try {
             const userString = await AsyncStorage.getItem('@appscholar_user');
-            if (userString) {
-                const user = JSON.parse(userString);
-                setPerfilUsuario(user.perfil);
-            }
+            if (userString) setPerfilUsuario(JSON.parse(userString).perfil);
         } catch (error) {
-            console.log("Erro ao carregar perfil:", error);
+            console.log('Erro ao carregar perfil:', error);
         }
     };
 
     const buscarAlunos = async () => {
         setLoading(true);
         try {
-            const response = await api.get('/admin/alunos');
-            setAlunos(response.data);
-        } catch (error) {
+            const { data } = await api.get('/admin/alunos');
+            setAlunos(data);
+        } catch {
             Alert.alert('Erro', 'Não foi possível carregar a lista de alunos.');
         } finally {
             setLoading(false);
         }
     };
 
+    const buscarCursos = async () => {
+        try {
+            const { data } = await api.get('/admin/cursos');
+            setCursos(data);
+        } catch {
+            console.log('Aviso: não foi possível carregar cursos para o seletor.');
+        }
+    };
+
+    // ── Modal de edição ─────────────────────────────────────
     const abrirModalEdicao = (aluno) => {
         setAlunoSelecionado(aluno);
         setNovoNome(aluno.nome);
         setNovaMatricula(aluno.matricula);
-        setNovoCurso(aluno.curso || '');
+        setNovoCursoId(aluno.curso_id ? aluno.curso_id.toString() : '');
         setNovoSemestre(aluno.semestre ? aluno.semestre.toString() : '');
         setModalVisible(true);
     };
@@ -64,60 +79,65 @@ export default function ListaAlunosScreen({ navigation }) {
             Alert.alert('Atenção', 'Nome e Matrícula são obrigatórios!');
             return;
         }
-
         try {
             await api.put(`/admin/alunos/${alunoSelecionado.id}`, {
-                nome: novoNome,
+                nome:      novoNome,
                 matricula: novaMatricula,
-                curso: novoCurso,
-                semestre: novoSemestre ? parseInt(novoSemestre) : null
+                semestre:  novoSemestre ? parseInt(novoSemestre) : null,
+                curso_id:  novoCursoId  ? parseInt(novoCursoId)  : null,
             });
             Alert.alert('Sucesso', 'Informações do aluno atualizadas!');
             setModalVisible(false);
-            buscarAlunos(); // Recarrega a lista
-        } catch (error) {
+            buscarAlunos();
+        } catch {
             Alert.alert('Erro', 'Não foi possível salvar as alterações.');
         }
     };
 
+    // ── Card de aluno ────────────────────────────────────────
     const renderAluno = ({ item }) => {
+        // Tenta mostrar o nome do curso vinculado, fallback para campo texto
+        const cursoLabel = item.curso_nome || item.curso || 'Não vinculado';
+
         return (
-            <View style={[globalStyles.card, { borderLeftWidth: 5, borderLeftColor: '#17a2b8', marginBottom: 15 }]}>
+            <View style={[globalStyles.card, styles.card]}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <View style={{ flex: 1 }}>
                         <Text style={globalStyles.cardTitle}>{item.nome}</Text>
-                        
+
                         <View style={styles.infoRow}>
                             <Ionicons name="card" size={14} color={colors.textMuted} />
-                            <Text style={styles.infoText}>Matrícula (RA): <Text style={{fontWeight: 'bold', color: '#333'}}>{item.matricula}</Text></Text>
-                        </View>
-                        
-                        <View style={styles.infoRow}>
-                            <Ionicons name="school" size={14} color={colors.textMuted} />
-                            <Text style={styles.infoText}>Curso: {item.curso || 'Não definido'} | {item.semestre ? `${item.semestre}º Sem.` : 'Semestre N/A'}</Text>
+                            <Text style={styles.infoText}>
+                                RA: <Text style={{ fontWeight: 'bold', color: '#333' }}>{item.matricula}</Text>
+                            </Text>
                         </View>
 
-                        {/* Secção de Matérias Matriculadas */}
-                        <Text style={styles.materiasTitulo}>Matérias Matriculadas:</Text>
+                        <View style={styles.infoRow}>
+                            <Ionicons name="school" size={14} color={colors.textMuted} />
+                            <Text style={styles.infoText}>
+                                Curso: <Text style={{ fontWeight: '600', color: colors.primary }}>{cursoLabel}</Text>
+                                {item.semestre ? `  •  ${item.semestre}º Sem.` : ''}
+                            </Text>
+                        </View>
+
+                        {/* Disciplinas matriculadas */}
+                        <Text style={styles.materiasTitulo}>Disciplinas Matriculadas:</Text>
                         {item.disciplinas_matriculadas && item.disciplinas_matriculadas.length > 0 ? (
-                            item.disciplinas_matriculadas.map((mat, index) => (
-                                <View key={index} style={styles.materiaBullet}>
-                                    <Text style={styles.materiaTexto}>• {mat.nome} ({mat.curso})</Text>
+                            item.disciplinas_matriculadas.map((mat, i) => (
+                                <View key={i} style={styles.materiaBullet}>
+                                    <Text style={styles.materiaTexto}>• {mat.nome}</Text>
                                 </View>
                             ))
                         ) : (
-                            <Text style={styles.materiaVazia}>Aluno não matriculado em disciplinas.</Text>
+                            <Text style={styles.materiaVazia}>Aluno sem disciplinas matriculadas.</Text>
                         )}
                     </View>
                 </View>
 
-                {/* Botão de Edição exclusivo para a Gestão */}
                 {(perfilUsuario === 'diretor' || perfilUsuario === 'master') && (
-                    <TouchableOpacity 
-                        style={styles.editButton}
-                        onPress={() => abrirModalEdicao(item)}
-                    >
-                        <Text style={styles.editButtonText}>✏️ Editar Informações</Text>
+                    <TouchableOpacity style={styles.editButton} onPress={() => abrirModalEdicao(item)}>
+                        <Ionicons name="create-outline" size={16} color="#495057" style={{ marginRight: 6 }} />
+                        <Text style={styles.editButtonText}>Editar Informações</Text>
                     </TouchableOpacity>
                 )}
             </View>
@@ -127,7 +147,9 @@ export default function ListaAlunosScreen({ navigation }) {
     return (
         <View style={globalStyles.mainContainer}>
             {loading ? (
-                <View style={globalStyles.centeredContent}><ActivityIndicator size="large" color={colors.primary} /></View>
+                <View style={globalStyles.centeredContent}>
+                    <ActivityIndicator size="large" color={colors.primary} />
+                </View>
             ) : (
                 <FlatList
                     data={alunos}
@@ -138,7 +160,7 @@ export default function ListaAlunosScreen({ navigation }) {
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
                             <Text style={globalStyles.screenTitle}>Gestão de Alunos</Text>
                             {(perfilUsuario === 'diretor' || perfilUsuario === 'master') && (
-                                <TouchableOpacity 
+                                <TouchableOpacity
                                     onPress={() => navigation.navigate('CadastroAluno')}
                                     style={{ backgroundColor: colors.primary, padding: 10, borderRadius: 12 }}
                                 >
@@ -147,40 +169,69 @@ export default function ListaAlunosScreen({ navigation }) {
                             )}
                         </View>
                     )}
-                    ListEmptyComponent={<Text style={{ textAlign: 'center', color: colors.textMuted }}>Nenhum aluno cadastrado.</Text>}
+                    ListEmptyComponent={
+                        <Text style={{ textAlign: 'center', color: colors.textMuted }}>
+                            Nenhum aluno cadastrado.
+                        </Text>
+                    }
                 />
             )}
 
-            {/* ================= MODAL DE EDIÇÃO ================= */}
-            <Modal visible={modalVisible} animationType="fade" transparent={true}>
-                <View style={styles.modalContainer}>
-                    <View style={styles.modalContent}>
-                        <Text style={styles.modalTitle}>Editar Aluno</Text>
-                        
-                        <Text style={styles.sectionSubtitle}>Nome Completo:</Text>
-                        <TextInput style={styles.input} value={novoNome} onChangeText={setNovoNome} />
+            {/* ══════════ MODAL DE EDIÇÃO ══════════ */}
+            <Modal visible={modalVisible} animationType="slide" transparent>
+                <View style={styles.overlay}>
+                    <View style={styles.modalBox}>
+                        <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+                            <Text style={styles.modalTitle}>✏️ Editar Aluno</Text>
 
-                        <View style={{flexDirection: 'row', justifyContent: 'space-between'}}>
-                            <View style={{flex: 0.48}}>
-                                <Text style={styles.sectionSubtitle}>Matrícula (RA):</Text>
-                                <TextInput style={styles.input} value={novaMatricula} onChangeText={setNovaMatricula} />
+                            <Text style={styles.fieldLabel}>Nome Completo:</Text>
+                            <TextInput style={styles.input} value={novoNome} onChangeText={setNovoNome} />
+
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                <View style={{ flex: 0.48 }}>
+                                    <Text style={styles.fieldLabel}>Matrícula (RA):</Text>
+                                    <TextInput style={styles.input} value={novaMatricula} onChangeText={setNovaMatricula} />
+                                </View>
+                                <View style={{ flex: 0.48 }}>
+                                    <Text style={styles.fieldLabel}>Semestre:</Text>
+                                    <TextInput
+                                        style={styles.input}
+                                        placeholder="Ex: 4"
+                                        keyboardType="numeric"
+                                        value={novoSemestre}
+                                        onChangeText={setNovoSemestre}
+                                    />
+                                </View>
                             </View>
-                            <View style={{flex: 0.48}}>
-                                <Text style={styles.sectionSubtitle}>Semestre:</Text>
-                                <TextInput style={styles.input} placeholder="Ex: 4" keyboardType="numeric" value={novoSemestre} onChangeText={setNovoSemestre} />
+
+                            {/* ── Seletor de curso ── */}
+                            <Text style={styles.fieldLabel}>Curso Vinculado:</Text>
+                            <View style={[styles.input, { padding: 0, overflow: 'hidden', marginBottom: 8 }]}>
+                                <Picker
+                                    selectedValue={novoCursoId}
+                                    onValueChange={(val) => setNovoCursoId(val)}
+                                >
+                                    <Picker.Item label="— Sem curso vinculado —" value="" color="#A0AEC0" />
+                                    {cursos.map((c) => (
+                                        <Picker.Item key={c.id} label={c.nome} value={c.id.toString()} />
+                                    ))}
+                                </Picker>
                             </View>
-                        </View>
 
-                        <Text style={styles.sectionSubtitle}>Curso:</Text>
-                        <TextInput style={styles.input} placeholder="Ex: DSM" value={novoCurso} onChangeText={setNovoCurso} />
+                            <TouchableOpacity
+                                style={[globalStyles.buttonPrimary, { marginTop: 8, paddingVertical: 14 }]}
+                                onPress={salvarEdicaoAluno}
+                            >
+                                <Text style={globalStyles.buttonText}>Salvar Alterações</Text>
+                            </TouchableOpacity>
 
-                        <TouchableOpacity style={[styles.closeButton, { backgroundColor: '#17a2b8' }]} onPress={salvarEdicaoAluno}>
-                            <Text style={styles.closeButtonText}>Salvar Alterações</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity style={styles.closeButton} onPress={() => setModalVisible(false)}>
-                            <Text style={styles.closeButtonText}>Cancelar</Text>
-                        </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[globalStyles.buttonPrimary, { backgroundColor: '#B2BEC3', marginTop: 10, paddingVertical: 14 }]}
+                                onPress={() => setModalVisible(false)}
+                            >
+                                <Text style={globalStyles.buttonText}>Cancelar</Text>
+                            </TouchableOpacity>
+                        </ScrollView>
                     </View>
                 </View>
             </Modal>
@@ -189,23 +240,23 @@ export default function ListaAlunosScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-    infoRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
+    card: { borderLeftWidth: 5, borderLeftColor: '#17a2b8', marginBottom: 15 },
+
+    infoRow:  { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
     infoText: { color: colors.textMuted, marginLeft: 6, fontSize: 13 },
-    
+
     materiasTitulo: { fontSize: 14, fontWeight: 'bold', color: '#444', marginTop: 12, marginBottom: 4 },
-    materiaBullet: { marginLeft: 6, marginBottom: 2, paddingLeft: 6, borderLeftWidth: 2, borderLeftColor: '#ddd' },
-    materiaTexto: { fontSize: 13, fontWeight: '600', color: '#007bff' },
-    materiaVazia: { fontSize: 13, color: '#999', fontStyle: 'italic', marginLeft: 4 },
-    
-    editButton: { backgroundColor: '#e9ecef', padding: 10, borderRadius: 6, alignItems: 'center', marginTop: 15, borderWidth: 1, borderColor: '#dee2e6' },
+    materiaBullet:  { marginLeft: 6, marginBottom: 2, paddingLeft: 6, borderLeftWidth: 2, borderLeftColor: '#ddd' },
+    materiaTexto:   { fontSize: 13, fontWeight: '600', color: '#007bff' },
+    materiaVazia:   { fontSize: 13, color: '#999', fontStyle: 'italic', marginLeft: 4 },
+
+    editButton:     { flexDirection: 'row', backgroundColor: '#e9ecef', padding: 10, borderRadius: 6, alignItems: 'center', justifyContent: 'center', marginTop: 15, borderWidth: 1, borderColor: '#dee2e6' },
     editButtonText: { color: '#495057', fontWeight: 'bold', fontSize: 14 },
 
-    modalContainer: { flex: 1, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.5)' },
-    modalContent: { backgroundColor: '#fff', margin: 20, padding: 20, borderRadius: 10, maxHeight: '85%' },
-    modalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 12, textAlign: 'center' },
-    sectionSubtitle: { fontSize: 14, fontWeight: 'bold', color: '#666', marginTop: 10, marginBottom: 4 },
-    input: { borderWidth: 1, borderColor: '#ccc', padding: 10, borderRadius: 6, backgroundColor: '#f9f9f9', marginTop: 2, marginBottom: 5 },
-    
-    closeButton: { backgroundColor: '#6c757d', padding: 12, borderRadius: 6, alignItems: 'center', marginTop: 10 },
-    closeButtonText: { color: '#fff', fontWeight: 'bold' }
+    // Modal
+    overlay:    { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
+    modalBox:   { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, maxHeight: '90%' },
+    modalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 16, color: colors.textMain },
+    fieldLabel: { fontSize: 13, fontWeight: '600', color: colors.primary, marginTop: 10, marginBottom: 4 },
+    input:      { borderWidth: 1, borderColor: colors.border, padding: 12, borderRadius: 10, backgroundColor: '#F7F9FC', fontSize: 15, color: colors.textMain, marginBottom: 4 },
 });

@@ -1,3 +1,4 @@
+// src/screens/DashboardScreen.js
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect, useState } from 'react';
@@ -34,80 +35,89 @@ export default function DashboardScreen({ navigation }) {
     <SafeAreaView style={globalStyles.mainContainer}>
       <StatusBar barStyle="dark-content" />
       <ScrollView contentContainerStyle={globalStyles.scrollContainer}>
-        
+
+        {/* ── Cabeçalho ── */}
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <View>
             <Text style={[globalStyles.label, { marginBottom: 0 }]}>Bem-vindo,</Text>
             <Text style={globalStyles.screenTitle}>
-              {usuario ? (usuario.perfil === 'master' ? 'Desenvolvedor' : usuario.nome || usuario.email) : 'Carregando...'}
+              {usuario
+                ? (usuario.perfil === 'master' ? 'Desenvolvedor' : usuario.nome || usuario.email)
+                : 'Carregando...'}
             </Text>
           </View>
           <TouchableOpacity onPress={handleLogout} style={{ backgroundColor: '#FFE3E3', padding: 10, borderRadius: 15 }}>
-             <Ionicons name="log-out-outline" size={30} color={colors.danger} />
+            <Ionicons name="log-out-outline" size={30} color={colors.danger} />
           </TouchableOpacity>
         </View>
 
         <Text style={[globalStyles.label, { marginBottom: 15 }]}>Menu Principal</Text>
 
         <View style={styles.grid}>
-          {/* ACESSOS: Apenas Desenvolvedor (Master) e Direção */}
+
+          {/* ACESSOS: master e diretor */}
           {usuario && (usuario.perfil === 'master' || usuario.perfil === 'diretor') && (
             <MenuCard title="Acessos" icon="shield-checkmark" color="#D63031" onPress={() => navigation.navigate('ListaUsuarios')} />
           )}
 
-          {/* GESTÃO DE SOLICITAÇÕES: Apenas Desenvolvedor e Direção */}
+          {/* PEDIDOS: master e diretor */}
           {usuario && (usuario.perfil === 'master' || usuario.perfil === 'diretor') && (
             <MenuCard title="Pedidos" icon="mail-unread" color="#00cec9" onPress={() => navigation.navigate('AdminSolicitacoes')} />
           )}
 
-          {/* ALUNOS: Desenvolvedor, Direção e Professor */}
+          {/* ✅ CURSOS: master e diretor */}
+          {usuario && (usuario.perfil === 'master' || usuario.perfil === 'diretor') && (
+            <MenuCard title="Cursos" icon="school" color="#6C5CE7" onPress={() => navigation.navigate('ListaCursos')} />
+          )}
+
+          {/* ALUNOS: master, diretor, professor */}
           {usuario && (usuario.perfil === 'master' || usuario.perfil === 'diretor' || usuario.perfil === 'professor') && (
             <MenuCard title="Alunos" icon="people" color="#0984E3" onPress={() => navigation.navigate('ListaAlunos')} />
           )}
 
-          {/* DISCIPLINAS: Todos têm acesso */}
+          {/* DISCIPLINAS: todos */}
           {usuario && (
             <MenuCard title="Disciplinas" icon="book" color="#E17055" onPress={() => navigation.navigate('ListaDisciplinas')} />
           )}
 
-          {/* PROFESSORES: Apenas Desenvolvedor e Direção */}
+          {/* PROFESSORES: master e diretor */}
           {usuario && (usuario.perfil === 'master' || usuario.perfil === 'diretor') && (
-            <MenuCard title="Professores" icon="school" color="#6C5CE7" onPress={() => navigation.navigate('ListaProfessores')} />
+            <MenuCard title="Professores" icon="ribbon" color="#6C5CE7" onPress={() => navigation.navigate('ListaProfessores')} />
           )}
 
-          {/* CHAMADA: Desenvolvedor, Direção e Professor */}
+          {/* CHAMADA: master, diretor, professor */}
           {usuario && (usuario.perfil === 'master' || usuario.perfil === 'diretor' || usuario.perfil === 'professor') && (
             <MenuCard title="Chamada" icon="calendar" color="#FDCB6E" onPress={() => navigation.navigate('ProfessorTurmas')} />
           )}
 
-          {/* LANÇAR NOTAS: Apenas Desenvolvedor e Professor */}
+          {/* LANÇAR NOTAS: master e professor */}
           {usuario && (usuario.perfil === 'master' || usuario.perfil === 'professor') && (
             <MenuCard title="Lançar Notas" icon="create" color="#E17055" onPress={() => navigation.navigate('ProfessorNotas')} />
           )}
 
-          {/* MEU BOLETIM: Apenas Desenvolvedor e Aluno */}
+          {/* MEU BOLETIM: master e aluno */}
           {usuario && (usuario.perfil === 'master' || usuario.perfil === 'aluno') && (
             <MenuCard title="Meu Boletim" icon="document-text" color="#00B894" onPress={() => navigation.navigate('Boletim')} />
           )}
 
-          {/* GRADE SEMANAL: Todos têm acesso */}
+          {/* GRADE SEMANAL: todos */}
           {usuario && (
             <MenuCard title="Grade Semanal" icon="time" color="#0984E3" onPress={() => navigation.navigate('AlunoGrade')} />
           )}
 
-          {/* SOLICITAÇÕES: Apenas Alunos */}
-          {usuario && (usuario.perfil === 'aluno') && (
+          {/* SOLICITAÇÕES: aluno */}
+          {usuario && usuario.perfil === 'aluno' && (
             <MenuCard title="Solicitações" icon="git-pull-request" color="#6C5CE7" onPress={() => navigation.navigate('AlunoSolicitacoes')} />
           )}
-        </View>
 
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
-  gridItem: { width: '48%', alignItems: 'center', paddingVertical: 25, justifyContent: 'center', marginBottom: 15 },
-  iconCircle: { padding: 15, borderRadius: 25, marginBottom: 15 }
+  grid:       { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
+  gridItem:   { width: '48%', alignItems: 'center', paddingVertical: 25, justifyContent: 'center', marginBottom: 15 },
+  iconCircle: { padding: 15, borderRadius: 25, marginBottom: 15 },
 });

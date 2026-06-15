@@ -1,3 +1,4 @@
+// backend/controllers/adminController.js
 const db = require('../database/db');
 const bcrypt = require('bcrypt');
 
@@ -27,8 +28,9 @@ const adminController = {
         }
     },
 
+    // ✅ ATUALIZADO: aceita curso_id para vinculação com a tabela cursos
     async cadastrarAluno(req, res) {
-        const { email, senha, nome, matricula, curso, semestre } = req.body;
+        const { email, senha, nome, matricula, curso, semestre, curso_id } = req.body;
         try {
             await db.query('BEGIN');
             const salt = await bcrypt.genSalt(10);
@@ -37,9 +39,18 @@ const adminController = {
                 "INSERT INTO usuarios (email, senha_hash, perfil) VALUES ($1, $2, 'aluno') RETURNING id",
                 [email, senhaHash]
             );
+
+            // Se curso_id informado, busca o nome do curso para preencher a coluna texto
+            let cursoNome = curso || null;
+            if (curso_id) {
+                const cursoRes = await db.query('SELECT nome FROM cursos WHERE id = $1', [curso_id]);
+                if (cursoRes.rows.length > 0) cursoNome = cursoRes.rows[0].nome;
+            }
+
             const alunoRes = await db.query(
-                "INSERT INTO alunos (usuario_id, nome, matricula, curso, semestre) VALUES ($1, $2, $3, $4, $5) RETURNING *",
-                [userRes.rows[0].id, nome, matricula, curso, semestre || null]
+                `INSERT INTO alunos (usuario_id, nome, matricula, curso, semestre, curso_id)
+                 VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+                [userRes.rows[0].id, nome, matricula, cursoNome, semestre || null, curso_id || null]
             );
             await db.query('COMMIT');
             res.status(201).json({ mensagem: 'Aluno cadastrado!', aluno: alunoRes.rows[0] });
@@ -132,19 +143,24 @@ const adminController = {
         } catch (erro) { await db.query('ROLLBACK'); res.status(500).json({ erro: erro.message }); }
     },
     
-    // --> LISTAGEM DE ALUNOS COM MATÉRIAS
+    // ✅ ATUALIZADO: inclui join com cursos e retorna curso_id + curso_nome
     async listarAlunos(req, res) {
         try {
             const query = `
-                SELECT a.*, 
+                SELECT a.*,
+                       c.id   AS curso_id,
+                       c.nome AS curso_nome,
                        COALESCE(
-                           JSON_AGG(JSON_BUILD_OBJECT('id', d.id, 'nome', d.nome, 'curso', d.curso)) FILTER (WHERE d.id IS NOT NULL), 
+                           JSON_AGG(
+                               JSON_BUILD_OBJECT('id', d.id, 'nome', d.nome, 'curso', d.curso)
+                           ) FILTER (WHERE d.id IS NOT NULL),
                            '[]'
-                       ) as disciplinas_matriculadas
+                       ) AS disciplinas_matriculadas
                 FROM alunos a
+                LEFT JOIN cursos c ON a.curso_id = c.id
                 LEFT JOIN aluno_disciplina ad ON a.id = ad.aluno_id
                 LEFT JOIN disciplinas d ON ad.disciplina_id = d.id
-                GROUP BY a.id
+                GROUP BY a.id, c.id, c.nome
                 ORDER BY a.nome
             `;
             const alunos = await db.query(query);
@@ -154,10 +170,10 @@ const adminController = {
         }
     },
 
-    // --> EDIÇÃO DIRETA DO ALUNO
+    // ✅ ATUALIZADO: salva curso_id e sincroniza campo texto curso
     async atualizarAluno(req, res) {
         const { id } = req.params;
-        const { nome, matricula, curso, semestre } = req.body;
+        const { nome, matricula, curso, semestre, curso_id } = req.body;
         
         try {
             const busca = await db.query('SELECT * FROM alunos WHERE id = $1', [id]);
@@ -165,18 +181,26 @@ const adminController = {
             
             const a = busca.rows[0];
 
-            const novoNome = nome !== undefined ? nome : a.nome;
-            const novaMatricula = matricula !== undefined ? matricula : a.matricula;
-            const novoCurso = curso !== undefined ? curso : a.curso;
-            const novoSemestre = semestre !== undefined && semestre !== '' ? parseInt(semestre) : a.semestre;
+            const novoNome     = nome      !== undefined ? nome      : a.nome;
+            const novaMatricula= matricula !== undefined ? matricula : a.matricula;
+            const novoSemestre = semestre  !== undefined && semestre !== '' ? parseInt(semestre) : a.semestre;
 
-            const updateQuery = `
-                UPDATE alunos 
-                SET nome = $1, matricula = $2, curso = $3, semestre = $4
-                WHERE id = $5 RETURNING *
-            `;
-            
-            const result = await db.query(updateQuery, [novoNome, novaMatricula, novoCurso, novoSemestre, id]);
+            // Resolução do campo curso e curso_id
+            let novoCursoId   = curso_id  !== undefined ? (curso_id || null) : a.curso_id;
+            let novoCursoText = curso     !== undefined ? curso               : a.curso;
+
+            // Se um curso_id foi fornecido, sincroniza o campo texto automaticamente
+            if (curso_id !== undefined && curso_id) {
+                const cursoRes = await db.query('SELECT nome FROM cursos WHERE id = $1', [curso_id]);
+                if (cursoRes.rows.length > 0) novoCursoText = cursoRes.rows[0].nome;
+            }
+
+            const result = await db.query(
+                `UPDATE alunos
+                 SET nome = $1, matricula = $2, curso = $3, semestre = $4, curso_id = $5
+                 WHERE id = $6 RETURNING *`,
+                [novoNome, novaMatricula, novoCursoText, novoSemestre, novoCursoId, id]
+            );
             res.json({ mensagem: 'Aluno atualizado com sucesso!', aluno: result.rows[0] });
         } catch (erro) {
             res.status(500).json({ erro: erro.message });
@@ -244,11 +268,10 @@ const adminController = {
         catch (erro) { res.status(500).json({ erro: erro.message }); }
     },
     
-    // --> FUNÇÃO ATUALIZADA PARA SALVAR A RESPOSTA DO ADMIN <--
     async responderSolicitacao(req, res) {
         try {
             await db.query('BEGIN');
-            const { status, resposta } = req.body; // Recebe o texto de resposta
+            const { status, resposta } = req.body;
 
             const att = await db.query(
                 'UPDATE solicitacoes SET status = $1, resposta = $2 WHERE id = $3 RETURNING *', 
@@ -257,7 +280,6 @@ const adminController = {
             
             const sol = att.rows[0];
 
-            // Mantém a lógica de matrícula automática caso existam pedidos antigos
             if (status === 'Aprovado' && sol.tipo === 'Matrícula' && sol.disciplina_id) {
                 await db.query('INSERT INTO aluno_disciplina (aluno_id, disciplina_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [sol.aluno_id, sol.disciplina_id]);
             }
